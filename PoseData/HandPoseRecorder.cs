@@ -7,24 +7,25 @@ using Oculus.Interaction.Input;
 using Oculus.Interaction;
 using System.Text;
 using System.Globalization;
+using Cysharp.Threading.Tasks;
 
 public class HandPoseRecorder : MonoBehaviour
 {
-    [Header("³ìÈ­ÇÒ ¼Õ ¸ğµ¨")]
+    [Header("ï¿½ï¿½È­ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½")]
     [SerializeField]
     private HandVisual leftHandVisual;
 
     [SerializeField]
     private HandVisual rightHandVisual;
 
-    [Header("OpenXR Root (ÀÚµ¿ Å½»ö)")]
+    [Header("OpenXR Root (ï¿½Úµï¿½ Å½ï¿½ï¿½)")]
     [SerializeField]
     private Transform leftOpenXRRoot;
 
     [SerializeField]
     private Transform rightOpenXRRoot;
 
-    [Header("³ìÈ­ ¼³Á¤")]
+    [Header("ï¿½ï¿½È­ ï¿½ï¿½ï¿½ï¿½")]
     [SerializeField]
     private string recordingFileName = "HandPose";
 
@@ -40,7 +41,7 @@ public class HandPoseRecorder : MonoBehaviour
     [SerializeField]
     private Transform referencePoint;
 
-    [Header("Å¸ÀÌ¸Ó ¼³Á¤")]
+    [Header("Å¸ï¿½Ì¸ï¿½ ï¿½ï¿½ï¿½ï¿½")]
     [SerializeField]
     private bool useTimer = false;
 
@@ -50,7 +51,7 @@ public class HandPoseRecorder : MonoBehaviour
     [SerializeField]
     private bool showCountdown = true;
 
-    [Header("³ìÈ­ »óÅÂ")]
+    [Header("ï¿½ï¿½È­ ï¿½ï¿½ï¿½ï¿½")]
     [SerializeField]
     private bool isRecording = false;
 
@@ -70,7 +71,7 @@ public class HandPoseRecorder : MonoBehaviour
 
     private StringBuilder csvBuilder = new StringBuilder(1024 * 100);
 
-    // Å¸ÀÌ¸Ó ÀÌº¥Æ®
+    // Å¸ï¿½Ì¸ï¿½ ï¿½Ìºï¿½Æ®
     public event Action<float> OnTimerTick;
     public event Action OnTimerComplete;
     public event Action OnRecordingStarted;
@@ -84,8 +85,8 @@ public class HandPoseRecorder : MonoBehaviour
         public int jointId;
         public Vector3 localPosition;
         public Quaternion localRotation;
-        public Vector3 rootPosition;     // OpenXRRootÀÇ À§Ä¡
-        public Quaternion rootRotation;  // OpenXRRootÀÇ È¸Àü
+        public Vector3 rootPosition;     // OpenXRRootï¿½ï¿½ ï¿½ï¿½Ä¡
+        public Quaternion rootRotation;  // OpenXRRootï¿½ï¿½ È¸ï¿½ï¿½
         public float timestamp;
     }
 
@@ -95,16 +96,16 @@ public class HandPoseRecorder : MonoBehaviour
 
         if (referencePoint == null)
         {
-            Debug.LogWarning("±âÁØÁ¡ÀÌ ¼³Á¤µÇÁö ¾Ê¾Æ ¿ùµå ÁÂÇ¥¸¦ »ç¿ëÇÕ´Ï´Ù.");
+            Debug.LogWarning("ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ê¾ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ç¥ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Õ´Ï´ï¿½.");
         }
     }
 
     /// <summary>
-    /// OpenXRRoot GameObject ÀÚµ¿ Å½»ö
+    /// OpenXRRoot GameObject ï¿½Úµï¿½ Å½ï¿½ï¿½
     /// </summary>
     private void FindOpenXRRoots()
     {
-        // ¿Ş¼Õ OpenXRRoot Ã£±â
+        // ï¿½Ş¼ï¿½ OpenXRRoot Ã£ï¿½ï¿½
         if (leftHandVisual != null && leftOpenXRRoot == null)
         {
             Transform parent = leftHandVisual.transform.parent;
@@ -113,7 +114,7 @@ public class HandPoseRecorder : MonoBehaviour
                 if (parent.name.Contains("OpenXRLeftHand") || parent.name.Contains("LeftHandAnchor"))
                 {
                     leftOpenXRRoot = parent;
-                    Debug.Log($"¿Ş¼Õ OpenXRRoot Ã£À½: {leftOpenXRRoot.name}");
+                    Debug.Log($"ï¿½Ş¼ï¿½ OpenXRRoot Ã£ï¿½ï¿½: {leftOpenXRRoot.name}");
                     break;
                 }
                 parent = parent.parent;
@@ -121,11 +122,11 @@ public class HandPoseRecorder : MonoBehaviour
 
             if (leftOpenXRRoot == null)
             {
-                Debug.LogWarning("¿Ş¼Õ OpenXRRoot¸¦ Ã£À» ¼ö ¾ø½À´Ï´Ù. ¼öµ¿ ¼³Á¤ ÇÊ¿ä!");
+                Debug.LogWarning("ï¿½Ş¼ï¿½ OpenXRRootï¿½ï¿½ Ã£ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï´ï¿½. ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ê¿ï¿½!");
             }
         }
 
-        // ¿À¸¥¼Õ OpenXRRoot Ã£±â
+        // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ OpenXRRoot Ã£ï¿½ï¿½
         if (rightHandVisual != null && rightOpenXRRoot == null)
         {
             Transform parent = rightHandVisual.transform.parent;
@@ -134,7 +135,7 @@ public class HandPoseRecorder : MonoBehaviour
                 if (parent.name.Contains("OpenXRRightHand") || parent.name.Contains("RightHandAnchor"))
                 {
                     rightOpenXRRoot = parent;
-                    Debug.Log($"¿À¸¥¼Õ OpenXRRoot Ã£À½: {rightOpenXRRoot.name}");
+                    Debug.Log($"ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ OpenXRRoot Ã£ï¿½ï¿½: {rightOpenXRRoot.name}");
                     break;
                 }
                 parent = parent.parent;
@@ -142,7 +143,7 @@ public class HandPoseRecorder : MonoBehaviour
 
             if (rightOpenXRRoot == null)
             {
-                Debug.LogWarning("¿À¸¥¼Õ OpenXRRoot¸¦ Ã£À» ¼ö ¾ø½À´Ï´Ù. ¼öµ¿ ¼³Á¤ ÇÊ¿ä!");
+                Debug.LogWarning("ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ OpenXRRootï¿½ï¿½ Ã£ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï´ï¿½. ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ê¿ï¿½!");
             }
         }
     }
@@ -157,7 +158,7 @@ public class HandPoseRecorder : MonoBehaviour
                 lastRecordTime = Time.time;
             }
 
-            // Å¸ÀÌ¸Ó »ç¿ë ÁßÀÌ¸é ½Ã°£ Ã¼Å©
+            // Å¸ï¿½Ì¸ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ì¸ï¿½ ï¿½Ã°ï¿½ Ã¼Å©
             if (useTimer)
             {
                 remainingTime = timerDuration - (Time.time - recordingStartTime);
@@ -170,7 +171,7 @@ public class HandPoseRecorder : MonoBehaviour
             }
         }
 
-        // Å¸ÀÌ¸Ó ´ë±â Áß
+        // Å¸ï¿½Ì¸ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½
         if (isWaitingToRecord)
         {
             remainingTime -= Time.deltaTime;
@@ -189,16 +190,16 @@ public class HandPoseRecorder : MonoBehaviour
         }
     }
 
-    // ³ìÈ­ ½ÃÀÛ (Å¸ÀÌ¸Ó °í·Á)
+    // ï¿½ï¿½È­ ï¿½ï¿½ï¿½ï¿½ (Å¸ï¿½Ì¸ï¿½ ï¿½ï¿½ï¿½ï¿½)
     public void StartRecording()
     {
         if (isRecording || isWaitingToRecord)
         {
-            Debug.LogWarning("ÀÌ¹Ì ³ìÈ­ ÁßÀÌ°Å³ª ´ë±â ÁßÀÔ´Ï´Ù.");
+            Debug.LogWarning("ï¿½Ì¹ï¿½ ï¿½ï¿½È­ ï¿½ï¿½ï¿½Ì°Å³ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ô´Ï´ï¿½.");
             return;
         }
 
-        // OpenXRRoot ÀçÅ½»ö (·±Å¸ÀÓ Áß º¯°æµÉ ¼ö ÀÖÀ½)
+        // OpenXRRoot ï¿½ï¿½Å½ï¿½ï¿½ (ï¿½ï¿½Å¸ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½)
         FindOpenXRRoots();
 
         recordedData.Clear();
@@ -207,10 +208,10 @@ public class HandPoseRecorder : MonoBehaviour
 
         if (useTimer && showCountdown)
         {
-            // Ä«¿îÆ®´Ù¿î ½ÃÀÛ
+            // Ä«ï¿½ï¿½Æ®ï¿½Ù¿ï¿½ ï¿½ï¿½ï¿½ï¿½
             isWaitingToRecord = true;
-            remainingTime = 3f; // 3ÃÊ Ä«¿îÆ®´Ù¿î
-            Debug.Log("<color=orange>3ÃÊ ÈÄ ³ìÈ­¸¦ ½ÃÀÛÇÕ´Ï´Ù...</color>");
+            remainingTime = 3f; // 3ï¿½ï¿½ Ä«ï¿½ï¿½Æ®ï¿½Ù¿ï¿½
+            Debug.Log("<color=orange>3ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½È­ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Õ´Ï´ï¿½...</color>");
         }
         else
         {
@@ -218,7 +219,7 @@ public class HandPoseRecorder : MonoBehaviour
         }
     }
 
-    // ½ÇÁ¦ ³ìÈ­ ½ÃÀÛ
+    // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½È­ ï¿½ï¿½ï¿½ï¿½
     private void ActualStartRecording()
     {
         isRecording = true;
@@ -230,45 +231,45 @@ public class HandPoseRecorder : MonoBehaviour
             remainingTime = timerDuration;
         }
 
-        Debug.Log($"<color=green>³ìÈ­ ½ÃÀÛ!</color>\n" +
-                 $"ÆÄÀÏ¸í: {recordingFileName}.csv\n" +
-                 $"³ìÈ­ °£°İ: {recordInterval}ÃÊ\n" +
-                 $"¿Ş¼Õ: {(recordLeftHand ? "ON" : "OFF")}\n" +
-                 $"¿À¸¥¼Õ: {(recordRightHand ? "ON" : "OFF")}\n" +
-                 $"Å¸ÀÌ¸Ó: {(useTimer ? timerDuration + "ÃÊ" : "OFF")}");
+        Debug.Log($"<color=green>ï¿½ï¿½È­ ï¿½ï¿½ï¿½ï¿½!</color>\n" +
+                 $"ï¿½ï¿½ï¿½Ï¸ï¿½: {recordingFileName}.csv\n" +
+                 $"ï¿½ï¿½È­ ï¿½ï¿½ï¿½ï¿½: {recordInterval}ï¿½ï¿½\n" +
+                 $"ï¿½Ş¼ï¿½: {(recordLeftHand ? "ON" : "OFF")}\n" +
+                 $"ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½: {(recordRightHand ? "ON" : "OFF")}\n" +
+                 $"Å¸ï¿½Ì¸ï¿½: {(useTimer ? timerDuration + "ï¿½ï¿½" : "OFF")}");
 
         OnRecordingStarted?.Invoke();
     }
 
-    // Å¸ÀÌ¸Ó Ãë¼Ò
+    // Å¸ï¿½Ì¸ï¿½ ï¿½ï¿½ï¿½
     public void CancelTimer()
     {
         if (isWaitingToRecord)
         {
             isWaitingToRecord = false;
             remainingTime = 0f;
-            Debug.Log("<color=red>Å¸ÀÌ¸Ó Ãë¼ÒµÊ</color>");
+            Debug.Log("<color=red>Å¸ï¿½Ì¸ï¿½ ï¿½ï¿½Òµï¿½</color>");
         }
     }
 
-    // ³ìÈ­ ÁßÁö
+    // ï¿½ï¿½È­ ï¿½ï¿½ï¿½ï¿½
     public void StopRecording()
     {
         if (!isRecording)
         {
-            Debug.LogWarning("³ìÈ­ ÁßÀÌ ¾Æ´Õ´Ï´Ù.");
+            Debug.LogWarning("ï¿½ï¿½È­ ï¿½ï¿½ï¿½ï¿½ ï¿½Æ´Õ´Ï´ï¿½.");
             return;
         }
 
         isRecording = false;
 
         float recordingDuration = Time.time - recordingStartTime;
-        Debug.Log($"<color=yellow>³ìÈ­ ÁßÁö</color>\n" +
-                 $"³ìÈ­ ½Ã°£: {recordingDuration:F1}ÃÊ\n" +
-                 $"ÇÁ·¹ÀÓ ¼ö: {recordedFrames}\n" +
-                 $"ÀúÀå Áß...");
+        Debug.Log($"<color=yellow>ï¿½ï¿½È­ ï¿½ï¿½ï¿½ï¿½</color>\n" +
+                 $"ï¿½ï¿½È­ ï¿½Ã°ï¿½: {recordingDuration:F1}ï¿½ï¿½\n" +
+                 $"ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½: {recordedFrames}\n" +
+                 $"ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½...");
 
-        SaveToCSV();
+        SaveToCSVAsync().Forget();
 
         OnRecordingStopped?.Invoke();
     }
@@ -300,7 +301,7 @@ public class HandPoseRecorder : MonoBehaviour
 
             if (recordedFrames % 10 == 0)
             {
-                Debug.Log($"³ìÈ­ Áß... ÇÁ·¹ÀÓ: {recordedFrames}");
+                Debug.Log($"ï¿½ï¿½È­ ï¿½ï¿½... ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½: {recordedFrames}");
             }
         }
     }
@@ -312,13 +313,13 @@ public class HandPoseRecorder : MonoBehaviour
 
         if (!handVisual.Hand.IsTrackedDataValid)
         {
-            Debug.LogWarning($"{handType} ÇÚµå Æ®·¡Å· µ¥ÀÌÅÍ°¡ À¯È¿ÇÏÁö ¾Ê½À´Ï´Ù.");
+            Debug.LogWarning($"{handType} ï¿½Úµï¿½ Æ®ï¿½ï¿½Å· ï¿½ï¿½ï¿½ï¿½ï¿½Í°ï¿½ ï¿½ï¿½È¿ï¿½ï¿½ï¿½ï¿½ ï¿½Ê½ï¿½ï¿½Ï´ï¿½.");
             return false;
         }
 
         float timestamp = Time.time - recordingStartTime;
 
-        // OpenXRRoot Transform ÀúÀå
+        // OpenXRRoot Transform ï¿½ï¿½ï¿½ï¿½
         Vector3 rootPos = Vector3.zero;
         Quaternion rootRot = Quaternion.identity;
 
@@ -326,23 +327,23 @@ public class HandPoseRecorder : MonoBehaviour
         {
             if (referencePoint != null)
             {
-                // ±âÁØÁ¡ »ó´ë ÁÂÇ¥·Î ÀúÀå
+                // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½Ç¥ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
                 rootPos = openXRRoot.position - referencePoint.position;
                 rootRot = Quaternion.Inverse(referencePoint.rotation) * openXRRoot.rotation;
             }
             else
             {
-                // ¿ùµå ÁÂÇ¥·Î ÀúÀå
+                // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ç¥ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
                 rootPos = openXRRoot.position;
                 rootRot = openXRRoot.rotation;
             }
         }
         else
         {
-            Debug.LogWarning($"{handType} OpenXRRoot¸¦ Ã£À» ¼ö ¾ø½À´Ï´Ù!");
+            Debug.LogWarning($"{handType} OpenXRRootï¿½ï¿½ Ã£ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï´ï¿½!");
         }
 
-        // °¢ Á¶ÀÎÆ® µ¥ÀÌÅÍ ÀúÀå
+        // ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Æ® ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
         for (int i = 0; i < handVisual.Joints.Count; i++)
         {
             Transform joint = handVisual.Joints[i];
@@ -359,7 +360,7 @@ public class HandPoseRecorder : MonoBehaviour
                 timestamp = timestamp
             };
 
-            // Wrist Á¶ÀÎÆ®¿¡¸¸ Root Transform ÀúÀå
+            // Wrist ï¿½ï¿½ï¿½ï¿½Æ®ï¿½ï¿½ï¿½ï¿½ Root Transform ï¿½ï¿½ï¿½ï¿½
             if (i == (int)HandJointId.HandWristRoot)
             {
                 frameData.rootPosition = rootPos;
@@ -382,11 +383,14 @@ public class HandPoseRecorder : MonoBehaviour
         return true;
     }
 
-    private void SaveToCSV()
+    /// <summary>
+    /// CSV íŒŒì¼ë¡œ ë¹„ë™ê¸° ì €ì¥
+    /// </summary>
+    private async UniTask SaveToCSVAsync()
     {
         if (recordedData.Count == 0)
         {
-            Debug.LogError("ÀúÀåÇÒ µ¥ÀÌÅÍ°¡ ¾ø½À´Ï´Ù.");
+            Debug.LogError("[HandPoseRecorder] ì €ì¥í•  ë°ì´í„°ê°€ ì—†ìŠµë‹ˆë‹¤.");
             return;
         }
 
@@ -394,9 +398,12 @@ public class HandPoseRecorder : MonoBehaviour
 
         try
         {
+            // ë°±ê·¸ë¼ìš´ë“œ ìŠ¤ë ˆë“œì—ì„œ CSV ìƒì„±
+            await UniTask.SwitchToThreadPool();
+
             csvBuilder.Clear();
 
-            // CSV Çì´õ - RootPos/RotÀ¸·Î º¯°æ
+            // CSV í—¤ë” - RootPos/Rot í¬í•¨
             csvBuilder.AppendLine("FrameIndex,HandType,JointID,LocalPosX,LocalPosY,LocalPosZ," +
                                  "LocalRotX,LocalRotY,LocalRotZ,LocalRotW,Timestamp," +
                                  "RootPosX,RootPosY,RootPosZ,RootRotX,RootRotY,RootRotZ,RootRotW");
@@ -407,7 +414,7 @@ public class HandPoseRecorder : MonoBehaviour
             {
                 if (data.jointId == (int)HandJointId.HandWristRoot)
                 {
-                    // Root Transform µ¥ÀÌÅÍ Æ÷ÇÔ
+                    // Root Transform ì •ë³´ í¬í•¨
                     csvBuilder.AppendFormat(invariantCulture,
                         "{0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11},{12},{13},{14},{15},{16},{17}\n",
                         data.frameIndex,
@@ -422,7 +429,7 @@ public class HandPoseRecorder : MonoBehaviour
                 }
                 else
                 {
-                    // ´Ù¸¥ Á¶ÀÎÆ®´Â Root µ¥ÀÌÅÍ ¾øÀÌ
+                    // ë‹¤ë¥¸ ì¡°ì¸íŠ¸ëŠ” Root ì •ë³´ ì—†ìŒ
                     csvBuilder.AppendFormat(invariantCulture,
                         "{0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},,,,,,,\n",
                         data.frameIndex,
@@ -435,17 +442,35 @@ public class HandPoseRecorder : MonoBehaviour
                 }
             }
 
-            File.WriteAllText(path, csvBuilder.ToString());
+            string csvContent = csvBuilder.ToString();
 
-            Debug.Log($"<color=green>CSV ÀúÀå ¿Ï·á!</color>\n°æ·Î: {path}\nÅ©±â: {new FileInfo(path).Length / 1024f:F1} KB");
+            // ë©”ì¸ ìŠ¤ë ˆë“œë¡œ ë³µê·€
+            await UniTask.SwitchToMainThread();
+
+            // ë¹„ë™ê¸° íŒŒì¼ ì“°ê¸°
+            await File.WriteAllTextAsync(path, csvContent);
+
+            long fileSize = new FileInfo(path).Length;
+            Debug.Log($"<color=green>[HandPoseRecorder] CSV ì €ì¥ ì™„ë£Œ!</color>\n" +
+                     $"ê²½ë¡œ: {path}\n" +
+                     $"í¬ê¸°: {fileSize / 1024f:F1} KB\n" +
+                     $"í”„ë ˆì„: {recordedData.Count}");
         }
         catch (Exception e)
         {
-            Debug.LogError($"CSV ÀúÀå ½ÇÆĞ: {e.Message}");
+            Debug.LogError($"[HandPoseRecorder] CSV ì €ì¥ ì‹¤íŒ¨: {e.Message}\n{e.StackTrace}");
         }
     }
 
-    // ³ìÈ­ Åä±Û
+    /// <summary>
+    /// ë™ê¸° ë²„ì „ ë˜í¼ (í•˜ìœ„ í˜¸í™˜ì„±)
+    /// </summary>
+    private void SaveToCSV()
+    {
+        SaveToCSVAsync().Forget();
+    }
+
+    // ï¿½ï¿½È­ ï¿½ï¿½ï¿½
     public void ToggleRecording()
     {
         if (isRecording)
@@ -458,7 +483,7 @@ public class HandPoseRecorder : MonoBehaviour
         }
     }
 
-    // ÆÄÀÏ¸í º¯°æ
+    // ï¿½ï¿½ï¿½Ï¸ï¿½ ï¿½ï¿½ï¿½ï¿½
     public void SetFileName(string fileName)
     {
         if (!string.IsNullOrEmpty(fileName))
@@ -467,32 +492,32 @@ public class HandPoseRecorder : MonoBehaviour
         }
     }
 
-    // ³ìÈ­ °£°İ º¯°æ
+    // ï¿½ï¿½È­ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
     public void SetRecordInterval(float interval)
     {
         recordInterval = Mathf.Max(0.01f, interval);
     }
 
-    // Å¸ÀÌ¸Ó ¼³Á¤
+    // Å¸ï¿½Ì¸ï¿½ ï¿½ï¿½ï¿½ï¿½
     public void SetTimerDuration(float duration)
     {
         timerDuration = Mathf.Max(1f, duration);
     }
 
-    // Å¸ÀÌ¸Ó Åä±Û
+    // Å¸ï¿½Ì¸ï¿½ ï¿½ï¿½ï¿½
     public void SetUseTimer(bool use)
     {
         useTimer = use;
     }
 
-    // »óÅÂ È®ÀÎ
+    // ï¿½ï¿½ï¿½ï¿½ È®ï¿½ï¿½
     public bool IsRecording() => isRecording;
     public bool IsWaitingToRecord() => isWaitingToRecord;
     public int GetRecordedFrames() => recordedFrames;
     public float GetRemainingTime() => remainingTime;
     public float GetRecordingDuration() => isRecording ? Time.time - recordingStartTime : 0f;
 
-    // ¼Õ È°¼ºÈ­ »óÅÂ º¯°æ
+    // ï¿½ï¿½ È°ï¿½ï¿½È­ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
     public void SetRecordLeftHand(bool record)
     {
         recordLeftHand = record;
@@ -506,28 +531,28 @@ public class HandPoseRecorder : MonoBehaviour
     public bool IsRecordingLeftHand() => recordLeftHand;
     public bool IsRecordingRightHand() => recordRightHand;
 
-    // CSV ÆÄÀÏ °æ·Î °¡Á®¿À±â
+    // CSV ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     public string GetSavedFilePath()
     {
         return Path.Combine(Application.persistentDataPath, recordingFileName + ".csv");
     }
 
-    // CSV ÆÄÀÏ Á¸Àç È®ÀÎ
+    // CSV ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ È®ï¿½ï¿½
     public bool DoesSavedFileExist()
     {
         return File.Exists(GetSavedFilePath());
     }
 
-    // OpenXRRoot ¼öµ¿ ¼³Á¤
+    // OpenXRRoot ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
     public void SetLeftOpenXRRoot(Transform root)
     {
         leftOpenXRRoot = root;
-        Debug.Log($"¿Ş¼Õ OpenXRRoot ¼öµ¿ ¼³Á¤: {root?.name}");
+        Debug.Log($"ï¿½Ş¼ï¿½ OpenXRRoot ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½: {root?.name}");
     }
 
     public void SetRightOpenXRRoot(Transform root)
     {
         rightOpenXRRoot = root;
-        Debug.Log($"¿À¸¥¼Õ OpenXRRoot ¼öµ¿ ¼³Á¤: {root?.name}");
+        Debug.Log($"ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ OpenXRRoot ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½: {root?.name}");
     }
 }

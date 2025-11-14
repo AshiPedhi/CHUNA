@@ -5,6 +5,8 @@ using System.IO;
 using Oculus.Interaction.Input;
 using Oculus.Interaction;
 using System.Globalization;
+using Cysharp.Threading.Tasks;
+using CHUNA.PoseData;
 
 public class HandPosePlayer : MonoBehaviour
 {
@@ -134,24 +136,8 @@ public class HandPosePlayer : MonoBehaviour
     private Vector3 leftPlayerCurrentPosition;
     private Vector3 rightPlayerCurrentPosition;
 
-    [System.Serializable]
-    private class PoseFrame
-    {
-        public Dictionary<int, PoseData> leftLocalPoses = new Dictionary<int, PoseData>();
-        public Dictionary<int, PoseData> rightLocalPoses = new Dictionary<int, PoseData>();
-        public Vector3 leftHandWorldPosition;
-        public Quaternion leftHandWorldRotation;
-        public Vector3 rightHandWorldPosition;
-        public Quaternion rightHandWorldRotation;
-        public float timestamp;
-    }
-
-    [System.Serializable]
-    private class PoseData
-    {
-        public Vector3 position;
-        public Quaternion rotation;
-    }
+    // PoseFrame과 PoseData는 CHUNA.PoseData 네임스페이스에서 사용
+    // (PoseDataClasses.cs 참조)
 
     public struct SimilarityResult
     {
@@ -180,6 +166,15 @@ public class HandPosePlayer : MonoBehaviour
         {
             Debug.Log($"기준점 설정됨: {referencePoint.name} at {referencePoint.position}");
         }
+    }
+
+    /// <summary>
+    /// 메모리 정리 (메모리 누수 방지)
+    /// </summary>
+    void OnDestroy()
+    {
+        loadedSequence?.Clear();
+        Debug.Log("[HandPosePlayer] 메모리 정리 완료");
     }
 
     private void InitializeReplayHands()
@@ -640,130 +635,34 @@ public class HandPosePlayer : MonoBehaviour
         return similarity;
     }
 
-    public void StartPlaybackFromCSV(string csvFileName)
+    /// <summary>
+    /// CSV 파일에서 포즈 시퀀스를 비동기로 로드하고 재생 시작
+    /// </summary>
+    public async UniTask StartPlaybackFromCSVAsync(string csvFileName)
     {
         ResetCompletionFlag();  // 재생 시작 시 완료 플래그 초기화
 
         string path = Path.Combine(Application.persistentDataPath, csvFileName + ".csv");
         if (!File.Exists(path))
         {
-            Debug.LogError("CSV 파일 없음: " + path);
+            Debug.LogError($"[HandPosePlayer] CSV 파일 없음: {path}");
             return;
         }
 
-        string[] lines = File.ReadAllLines(path);
-        if (lines.Length < 2)
+        // 비동기 로딩
+        PoseSequence sequence = await PoseDataUtility.LoadFromCSVAsync(path);
+
+        if (sequence == null || sequence.frames.Count == 0)
         {
-            Debug.LogError("CSV 데이터 부족.");
+            Debug.LogError("[HandPosePlayer] CSV 파싱 실패 또는 데이터 없음");
             return;
         }
 
+        // 로드된 시퀀스를 내부 리스트에 복사
         loadedSequence.Clear();
-        PoseFrame currentFrame = null;
-        int lastFrameIndex = -1;
+        loadedSequence.AddRange(sequence.frames);
 
-        CultureInfo invariantCulture = CultureInfo.InvariantCulture;
-
-        for (int i = 1; i < lines.Length; i++)
-        {
-            try
-            {
-                string[] values = lines[i].Split(',');
-
-                if (values.Length < 11)
-                {
-                    Debug.LogWarning($"라인 {i}: 필드가 부족합니다. ({values.Length}개)");
-                    continue;
-                }
-
-                int frameIndex = int.Parse(values[0], invariantCulture);
-                string handType = values[1].Trim();
-                int jointId = int.Parse(values[2], invariantCulture);
-
-                Vector3 pos = new Vector3(
-                    float.Parse(values[3], invariantCulture),
-                    float.Parse(values[4], invariantCulture),
-                    float.Parse(values[5], invariantCulture)
-                );
-                Quaternion rot = new Quaternion(
-                    float.Parse(values[6], invariantCulture),
-                    float.Parse(values[7], invariantCulture),
-                    float.Parse(values[8], invariantCulture),
-                    float.Parse(values[9], invariantCulture)
-                );
-                float timestamp = float.Parse(values[10], invariantCulture);
-
-                if (frameIndex != lastFrameIndex)
-                {
-                    if (currentFrame != null) loadedSequence.Add(currentFrame);
-                    currentFrame = new PoseFrame { timestamp = timestamp };
-                    lastFrameIndex = frameIndex;
-                }
-
-                PoseData poseData = new PoseData { position = pos, rotation = rot };
-
-                if (handType == "Left")
-                {
-                    currentFrame.leftLocalPoses[jointId] = poseData;
-
-                    if (jointId == 0 && values.Length >= 18)
-                    {
-                        if (!string.IsNullOrEmpty(values[11]) &&
-                            !string.IsNullOrEmpty(values[14]))
-                        {
-                            currentFrame.leftHandWorldPosition = new Vector3(
-                                float.Parse(values[11], invariantCulture),
-                                float.Parse(values[12], invariantCulture),
-                                float.Parse(values[13], invariantCulture)
-                            );
-                            currentFrame.leftHandWorldRotation = new Quaternion(
-                                float.Parse(values[14], invariantCulture),
-                                float.Parse(values[15], invariantCulture),
-                                float.Parse(values[16], invariantCulture),
-                                float.Parse(values[17], invariantCulture)
-                            );
-                        }
-                    }
-                }
-                else if (handType == "Right")
-                {
-                    currentFrame.rightLocalPoses[jointId] = poseData;
-
-                    if (jointId == 0 && values.Length >= 18)
-                    {
-                        if (!string.IsNullOrEmpty(values[11]) &&
-                            !string.IsNullOrEmpty(values[14]))
-                        {
-                            currentFrame.rightHandWorldPosition = new Vector3(
-                                float.Parse(values[11], invariantCulture),
-                                float.Parse(values[12], invariantCulture),
-                                float.Parse(values[13], invariantCulture)
-                            );
-                            currentFrame.rightHandWorldRotation = new Quaternion(
-                                float.Parse(values[14], invariantCulture),
-                                float.Parse(values[15], invariantCulture),
-                                float.Parse(values[16], invariantCulture),
-                                float.Parse(values[17], invariantCulture)
-                            );
-                        }
-                    }
-                }
-            }
-            catch (Exception e)
-            {
-                Debug.LogError($"라인 {i} 파싱 실패: {e.Message}\n라인 내용: {lines[i]}");
-                continue;
-            }
-        }
-
-        if (currentFrame != null) loadedSequence.Add(currentFrame);
-
-        if (loadedSequence.Count == 0)
-        {
-            Debug.LogError("CSV 파싱 실패.");
-            return;
-        }
-
+        // 재생 시작
         if (playLeftHand)
         {
             isLeftPlaying = true;
@@ -780,10 +679,19 @@ public class HandPosePlayer : MonoBehaviour
             ApplyRightHandFrame();
         }
 
-        Debug.Log($"<color=cyan>재생 시작</color> - 총 {loadedSequence.Count} 프레임\n" +
+        Debug.Log($"<color=cyan>[HandPosePlayer] 재생 시작</color> - 총 {loadedSequence.Count} 프레임\n" +
+                 $"파일: {csvFileName}\n" +
                  $"기준점: {(referencePoint != null ? referencePoint.name : "없음")}\n" +
                  $"손 위치 비교: {(compareHandPosition ? "ON" : "OFF")}\n" +
                  $"손 회전 비교: {(compareHandRotation ? "ON" : "OFF")}");
+    }
+
+    /// <summary>
+    /// 동기 버전 래퍼 (하위 호환성 유지)
+    /// </summary>
+    public void StartPlaybackFromCSV(string csvFileName)
+    {
+        StartPlaybackFromCSVAsync(csvFileName).Forget();
     }
 
     public void StartLeftHandPlayback(string csvFileName)
