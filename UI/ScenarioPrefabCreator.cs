@@ -63,11 +63,11 @@ public class ScenarioPrefabCreator : MonoBehaviour
         dotsRect.offsetMin = Vector2.zero;
         dotsRect.offsetMax = Vector2.zero;
         
-        // DotTimeline 컴포넌트 추가 및 설정
-        DotTimeline dotTimeline = dotTimelineObj.AddComponent<DotTimeline>();
-        
+        // DotTimelineController 컴포넌트 추가 및 설정
+        DotTimelineController dotTimeline = dotTimelineObj.AddComponent<DotTimelineController>();
+
         // Reflection을 사용하여 private 필드 설정
-        var dotsContainerField = typeof(DotTimeline).GetField("dotsContainer", 
+        var dotsContainerField = typeof(DotTimelineController).GetField("dotsContainer", 
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
         if (dotsContainerField != null)
         {
@@ -211,7 +211,7 @@ public class ScenarioPrefabCreator : MonoBehaviour
         {
             // DotTimeline 프리팹이 없으면 기본 GameObject 생성
             dotTimelineInstance = new GameObject("DotTimeline");
-            dotTimelineInstance.AddComponent<DotTimeline>();
+            dotTimelineInstance.AddComponent<DotTimelineController>();
         }
         
         dotTimelineInstance.transform.SetParent(canvasObj.transform, false);
@@ -231,7 +231,7 @@ public class ScenarioPrefabCreator : MonoBehaviour
         SetPrivateField(manager, "descriptionText", descText);
         SetPrivateField(manager, "nextButton", button);
         SetPrivateField(manager, "nextButtonText", labelText);
-        SetPrivateField(manager, "dotTimeline", dotTimelineInstance.GetComponent<DotTimeline>());
+        SetPrivateField(manager, "dotTimeline", dotTimelineInstance.GetComponent<DotTimelineController>());
         SetPrivateField(manager, "scenarioName", "상부승모근");
         SetPrivateField(manager, "nextStepText", "다음");
         SetPrivateField(manager, "completeText", "완료");
